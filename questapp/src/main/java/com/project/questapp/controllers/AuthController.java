@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.project.questapp.entities.User;
 import com.project.questapp.requests.UserRequest;
+import com.project.questapp.responses.AuthResponse;
 import com.project.questapp.security.JwtTokenProvider;
 import com.project.questapp.services.UserService;
 
@@ -38,50 +39,47 @@ public class AuthController {
 	}
 	
 	@PostMapping("/login")
-	public ResponseEntity<String> login(@RequestBody UserRequest loginRequest) {
-	    try {
-	        System.out.println("*****login girdi*********");
-	        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-	                loginRequest.getUserName(), loginRequest.getPassword());
-	        
-	        System.out.println("************"+authToken.toString());
-	        System.out.println("***deneme***"+authToken.getCredentials());
-	        
-	        Authentication auth = authenticationManager.authenticate(authToken);
+	public AuthResponse login(@RequestBody UserRequest loginRequest) {
+    	System.out.println("*****login girdi*********");
+        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                loginRequest.getUserName(), loginRequest.getPassword());
+        
+        System.out.println("************"+authToken.toString());
+        System.out.println("***deneme***"+authToken.getCredentials());
+        
+        Authentication auth = authenticationManager.authenticate(authToken);
 
-	        
-	        SecurityContextHolder.getContext().setAuthentication(auth);
+        
+        SecurityContextHolder.getContext().setAuthentication(auth);
 
-	        // JWT token'ı oluştur
-	        String jwtToken = jwtTokenProvider.generateJwtToken(auth);
+        // JWT token'ı oluştur
+        String jwtToken = jwtTokenProvider.generateJwtToken(auth);
 
-	        // JWT token'ı başarıyla döndür
-	        return ResponseEntity.ok("Bearer " + jwtToken);
-
-	    } catch (AuthenticationException ex) {
-	        // Kimlik doğrulama hatası
-	        System.err.println("Authentication failed: " + ex);
-	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication failed: " + ex.getMessage());
-
-	    } catch (Exception ex) {
-	        // Diğer hatalar
-	        System.err.println("An error occurred: " + ex.getMessage());
-	        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred: " + ex.getMessage());
-	    }
+        User user = userService.getOneUserByName(loginRequest.getUserName());
+        
+        // JWT token'ı başarıyla döndür
+        AuthResponse authResponse = new AuthResponse();
+        authResponse.setMessage("Bearer " + jwtToken);
+        authResponse.setUserId(user.getId());
+        return authResponse;
 	}
 
 	
 	@PostMapping("/register")
-	public ResponseEntity<String> register(@RequestBody UserRequest registerRequest){
-		if(userService.getOneUserByName(registerRequest.getUserName()) != null)
-			return new ResponseEntity<>("Username already in use", HttpStatus.BAD_REQUEST);
+	public ResponseEntity<AuthResponse> register(@RequestBody UserRequest registerRequest){
+		AuthResponse authResponse = new AuthResponse();
 		
+		if(userService.getOneUserByName(registerRequest.getUserName()) != null) {
+			authResponse.setMessage("Username already in use");
+			return new ResponseEntity<>(authResponse, HttpStatus.BAD_REQUEST);
+		}
 		User user = new User();
 		user.setUserName(registerRequest.getUserName());
 		user.setPassword(passwordEncoder.encode(registerRequest.getPassword()) );
 		userService.saveOneUser(user);
 		System.out.println("*****encodededede*****"+passwordEncoder.encode(registerRequest.getPassword()));
-		return new ResponseEntity<>("User successfully registered",HttpStatus.CREATED);
+		authResponse.setMessage("user successfully registered");
+		return new ResponseEntity<>(authResponse,HttpStatus.CREATED);
 	}
 	
 		
